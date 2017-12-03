@@ -27,12 +27,12 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 
 	default_random_engine gen;
 
-	self.num_particles = 100;
+	num_particles = 100;
 
 	// Creates a normal (Gaussian) distribution for x,y and theta.
 	normal_distribution<double> dist_x(x, std[0]);
 	normal_distribution<double> dist_y(y, std[1]);
-	normal_distribution<double> dist_theta(theta, std[2])
+	normal_distribution<double> dist_theta(theta, std[2]);
 
     for (int i = 1; i <= num_particles; i++){
         Particle p = {};    
