@@ -66,10 +66,20 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 
     for (int i = 0; i < num_particles; i++) {
 
-        particles[i].x += velocity / yaw_rate * (sin(particles[i].theta + yaw_rate*delta_t) - sin(particles[i].theta));
-        particles[i].y += velocity / yaw_rate * (cos(particles[i].theta) - cos(particles[i].theta + yaw_rate*delta_t));
-        particles[i].theta += yaw_rate * delta_t;
+        if(yaw_rate < 0.0001)
+        {
+            particles[i].x += velocity * delta_t * cos(particles[i].theta);
+            particles[i].y += velocity * delta_t * sin(particles[i].theta);
+            /* Theta remains same since yaw rate is almost zero */
+        }
+        else
+        {
+            particles[i].x += velocity / yaw_rate * (sin(particles[i].theta + yaw_rate*delta_t) - sin(particles[i].theta));
+            particles[i].y += velocity / yaw_rate * (cos(particles[i].theta) - cos(particles[i].theta + yaw_rate*delta_t));
+            particles[i].theta += yaw_rate * delta_t;
 
+        }
+        
         /* Add noise */
         particles[i].x += N_x_noise(gen);
         particles[i].y += N_y_noise(gen);
@@ -85,6 +95,35 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to 
 	//   implement this method and use it as a helper during the updateWeights phase.
 
+    /* Loop though all the observed landmarks */
+    for (unsigned int i = 0; i < observations.size(); i++) {
+    
+       LandmarkObs obs_pos = observations[i];
+
+       /* Initialize minimum distance to max value */
+       double min_dist = numeric_limits<double>::max();
+
+       /* Initialize ID of the nearest observed landmark */
+       int id = -1;
+    
+       /* For each landmark observation, find the nearest predicted observation */
+       for (unsigned int j = 0; j < predicted.size(); j++) {
+      
+           LandmarkObs pred_pos = predicted[j];
+      
+           /* Compute the distance between current/predicted landmarks */
+           double cur_dist = dist(obs_pos.x, obs_pos.y, pred_pos.x, pred_pos.y);
+
+           /* Identify the landmark nearest to the predicted landmark observation */
+           if (cur_dist < min_dist) {
+              min_dist = cur_dist;
+              id = pred_pos.id;
+            }
+        }
+    /* set the observation's id to the nearest predicted landmark's id */
+    observations[i].id = id;
+  }
+
 }
 
 void ParticleFilter::updateWeights(double sensor_range, double std_landmark[], 
@@ -99,6 +138,45 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   and the following is a good resource for the actual equation to implement (look at equation 
 	//   3.33
 	//   http://planning.cs.uiuc.edu/node99.html
+
+    vector<LandmarkObs> landmarks_in_range;
+    vector<LandmarkObs> map_observations;
+
+    // Loop through each particle
+    for (int i = 0; i < num_particles; ++i){
+
+        vector<LandmarkObs> transformed_obs;
+        // For each observation
+        for (int j = 0; j < observations.size(); ++j){
+            // Transform the observation point (from vehicle coordinates to map coordinates)
+            double trans_obs_x, trans_obs_y;
+            trans_obs_x = observations[j].x * cos(particles[i].theta) - observations[j].y * sin(particles[i].theta) + particles[i].x;
+            trans_obs_y = observations[j].x * sin(particles[i].theta) + observations[j].y * cos(particles[i].theta) + particles[i].y;
+
+            transformed_obs.push_back(LandmarkObs{ observations[j].id, trans_obs_x, trans_obs_x});
+        }
+
+        /* Find map landmarks that are within sensor range */
+        for (int j = 0;  j < map_landmarks.landmark_list.size(); j++){
+            int landmark_id = map_landmarks.landmark_list[j].id_i;
+            float landmark_x = map_landmarks.landmark_list[j].x_f;
+            float landmark_y = map_landmarks.landmark_list[j].y_f;
+
+            float dist_x = landmark_x - particles[i].x;
+            float dist_y = landmark_y - particles[i].y;
+
+            float range = sqrt(dist_x + dist_y);
+            if(range < sensor_range){
+
+                 landmarks_in_range.push_back(LandmarkObs{landmark_id, landmark_x, landmark_y});
+            }
+        }
+
+        /* Perform data association */
+        dataAssociation(landmarks_in_range, transformed_obs);
+
+    }      
+    
 }
 
 void ParticleFilter::resample() {
