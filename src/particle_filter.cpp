@@ -140,7 +140,6 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   http://planning.cs.uiuc.edu/node99.html
 
     vector<LandmarkObs> landmarks_in_range;
-    vector<LandmarkObs> map_observations;
 
     // Loop through each particle
     for (int i = 0; i < num_particles; ++i){
@@ -174,6 +173,35 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
         /* Perform data association */
         dataAssociation(landmarks_in_range, transformed_obs);
+
+        /* initialize weight */
+        particles[i].weight = 1.0;
+
+        for (unsigned int j = 0; j < transformed_obs.size(); j++) {
+          
+          /* placeholders for observation and associated prediction coordinates */
+          double obs_x, obs_y, lm_x, lm_y;
+          obs_x = transformed_obs[j].x;
+          obs_y = transformed_obs[j].y;
+
+          int assoc_lm_id = transformed_obs[j].id;
+
+          // get the x,y coordinates of the prediction associated with the current observation
+          for (unsigned int k = 0; k < landmarks_in_range.size(); k++) {
+            if (landmarks_in_range[k].id == assoc_lm_id) {
+                lm_x = landmarks_in_range[k].x;
+                lm_y = landmarks_in_range[k].y;
+            }
+        }
+
+          // calculate weight for this observation with multivariate Gaussian
+          double s_x = std_landmark[0];
+          double s_y = std_landmark[1];
+          double obs_w = ( 1/(2*M_PI*s_x*s_y)) * exp( -( pow(lm_x-obs_x,2)/(2*pow(s_x, 2)) + (pow(lm_y-obs_y,2)/(2*pow(s_y, 2))) ) );
+
+          // product of this obersvation weight with total observations weight
+          particles[i].weight *= obs_w;
+        }
 
     }      
     
