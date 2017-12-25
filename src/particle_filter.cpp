@@ -149,6 +149,7 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
         }
     /* set the observation's id to the nearest predicted landmark's id */
      observations[i].id = id;
+     std::cout<<"assoc_id: "<<id<< "obs_pos x: "<<obs_pos.x<<"obs_pos y: "<<obs_pos.y<<std::endl;
 
   }
 
@@ -185,7 +186,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
             trans_obs_x = observations[j].x * cos(particles[i].theta) - observations[j].y * sin(particles[i].theta) + particles[i].x;
             trans_obs_y = observations[j].x * sin(particles[i].theta) + observations[j].y * cos(particles[i].theta) + particles[i].y;
 
-            transformed_obs.push_back(LandmarkObs{ observations[j].id, trans_obs_x, trans_obs_x});
+            transformed_obs.push_back(LandmarkObs{ observations[j].id, trans_obs_x, trans_obs_y});
         }
 
         /* Find map landmarks that are within sensor range */
@@ -197,12 +198,15 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
             float dist_x = landmark_x - particles[i].x;
             float dist_y = landmark_y - particles[i].y;
 
-            float range = sqrt(dist_x + dist_y);
+            float range = sqrt((dist_x * dist_x) + (dist_y * dist_y));
             if(range < sensor_range){
 
                  landmarks_in_range.push_back(LandmarkObs{landmark_id, landmark_x, landmark_y});
+                 std::cout<<"landmarks in range: "<<landmark_id<<" " <<landmark_x<<" "<<landmark_y<<std::endl;
             }
         }
+
+
 
         /* Perform data association */
         dataAssociation(landmarks_in_range, transformed_obs);
@@ -218,6 +222,8 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
           obs_y = transformed_obs[j].y;
 
           int assoc_lm_id = transformed_obs[j].id;
+
+         // std::cout<< "obs_x: "<<obs_x<<"obs_y: "<<obs_y<<std::endl;
 
           /* get the x,y coordinates of the land mark associated with the current observation */
           for (unsigned int k = 0; k < landmarks_in_range.size(); k++) {
