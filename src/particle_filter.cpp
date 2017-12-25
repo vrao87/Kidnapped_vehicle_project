@@ -19,11 +19,30 @@
 
 using namespace std;
 
+#define DEBUG 1
+#define NORMAL 0
+#define RUN_MODE NORMAL
+
+
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	// TODO: Set the number of particles. Initialize all particles to first position (based on estimates of 
 	//   x, y, theta and their uncertainties from GPS) and all weights to 1. 
 	// Add random Gaussian noise to each particle.
 	// NOTE: Consult particle_filter.h for more information about this method (and others in this file).
+#if RUN_MODE == DEBUG
+    /* debug code here */
+    num_particles = 1;
+
+    /* Instantiate particle */
+    Particle p = {};    
+    /* assign values to p */
+    p.id = 0;
+    p.x = x;
+    p.y = y;
+    p.theta = theta;
+    p.weight = 1.0;
+    particles.push_back(p);
+#else
 
 	default_random_engine gen;
 
@@ -34,7 +53,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	normal_distribution<double> dist_y(y, std[1]);
 	normal_distribution<double> dist_theta(theta, std[2]);
 
-    for (int i = 1; i <= num_particles; i++){
+    for (int i = 0; i < num_particles; i++){
         /* Instantiate particle */
         Particle p = {};    
         /* assign values to p */
@@ -46,8 +65,10 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 
         /* add p to particles vector */
         particles.push_back(p);
+        weights.push_back(p.weight);
     }
-
+#endif
+    std::cout<<"Initialized"<<std::endl;
     is_initialized = true;
 
 }
@@ -57,17 +78,18 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	// NOTE: When adding noise you may find std::normal_distribution and std::default_random_engine useful.
 	//  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
 	//  http://www.cplusplus.com/reference/random/default_random_engine/
-
+#if RUN_MODE == NORMAL
 	default_random_engine gen;
 
 	  /* define normal distributions for sensor noise with zero mean and standard deviationa as std_pos */
     normal_distribution<double> N_x_noise(0, std_pos[0]);
     normal_distribution<double> N_y_noise(0, std_pos[1]);
     normal_distribution<double> N_theta_noise(0, std_pos[2]);
+#endif
 
     for (int i = 0; i < num_particles; i++) {
 
-        if(yaw_rate < 0.0001)
+        if(fabs(yaw_rate) < 0.0001)
         {
             particles[i].x += velocity * delta_t * cos(particles[i].theta);
             particles[i].y += velocity * delta_t * sin(particles[i].theta);
@@ -75,18 +97,20 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
         }
         else
         {
-            particles[i].x += velocity / yaw_rate * (sin(particles[i].theta + yaw_rate*delta_t) - sin(particles[i].theta));
-            particles[i].y += velocity / yaw_rate * (cos(particles[i].theta) - cos(particles[i].theta + yaw_rate*delta_t));
+            particles[i].x += (velocity / yaw_rate) * (sin(particles[i].theta + (yaw_rate * delta_t)) - sin(particles[i].theta));
+            particles[i].y += (velocity / yaw_rate) * (cos(particles[i].theta) - cos(particles[i].theta + (yaw_rate * delta_t)));
             particles[i].theta += yaw_rate * delta_t;
 
         }
-        
+
+        std::cout << "Predicted" << std::endl;
+        #if RUN_MODE == NORMAL
         /* Add noise */
         particles[i].x += N_x_noise(gen);
         particles[i].y += N_y_noise(gen);
         particles[i].theta += N_theta_noise(gen);
+        #endif
     }
-
 
 }
 
@@ -96,7 +120,8 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to 
 	//   implement this method and use it as a helper during the updateWeights phase.
 
-    /* Loop though all the observed landmarks */
+
+    /* Loop through all the observed landmarks */
     for (unsigned int i = 0; i < observations.size(); i++) {
     
        LandmarkObs obs_pos = observations[i];
@@ -119,10 +144,12 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
            if (cur_dist < min_dist) {
               min_dist = cur_dist;
               id = pred_pos.id;
+
             }
         }
     /* set the observation's id to the nearest predicted landmark's id */
-    observations[i].id = id;
+     observations[i].id = id;
+
   }
 
 }
@@ -140,12 +167,17 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   3.33
 	//   http://planning.cs.uiuc.edu/node99.html
 
+#if RUN_MODE == DEBUG
+    return;
+#else
     vector<LandmarkObs> landmarks_in_range;
+
 
     /* Loop over each particle */
     for (int i = 0; i < num_particles; ++i){
 
         vector<LandmarkObs> transformed_obs;
+
         /* loop over each observation */
         for (int j = 0; j < observations.size(); ++j){
             /* Transform the observation point (from vehicle coordinates to map coordinates) */
@@ -199,12 +231,14 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
           double s_x = std_landmark[0];
           double s_y = std_landmark[1];
           double obs_w = ( 1/(2*M_PI*s_x*s_y)) * exp( -( pow(lm_x-obs_x,2)/(2*pow(s_x, 2)) + (pow(lm_y-obs_y,2)/(2*pow(s_y, 2))) ) );
+          //std::cout<<"obs_w: " << obs_w << std::endl;
 
           /* product of this obersvation weight with total observations weight */
           particles[i].weight *= obs_w;
         }
-
-    }      
+        std::cout << "Particle weight" << particles[i].weight << std::endl;
+    }
+#endif      
     
 }
 
@@ -213,12 +247,16 @@ void ParticleFilter::resample() {
 	// NOTE: You may find std::discrete_distribution helpful here.
 	//   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
 
+#if RUN_MODE == DEBUG
+    std::cout << "Predict Debug mode no update" <<std::endl;
+    return;
+#else
+
    vector<Particle> particles_resampled;
 
    default_random_engine gen;
    
     /* get all of the current weights */
-   vector<double> weights;
    for (int i = 0; i < num_particles; i++) {
       weights.push_back(particles[i].weight);
    }
@@ -246,7 +284,7 @@ void ParticleFilter::resample() {
    }
 
    particles = particles_resampled;
-
+#endif
 }
 
 Particle ParticleFilter::SetAssociations(Particle& particle, const std::vector<int>& associations, 
@@ -256,6 +294,10 @@ Particle ParticleFilter::SetAssociations(Particle& particle, const std::vector<i
     // associations: The landmark id that goes along with each listed association
     // sense_x: the associations x mapping already converted to world coordinates
     // sense_y: the associations y mapping already converted to world coordinates
+    //Clear the previous associations
+    particle.associations.clear();
+    particle.sense_x.clear();
+    particle.sense_y.clear();
 
     particle.associations= associations;
     particle.sense_x = sense_x;
