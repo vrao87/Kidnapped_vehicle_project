@@ -46,7 +46,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 
 	default_random_engine gen;
 
-	num_particles = 50;
+	num_particles = 80;
 
 	// Creates a normal (Gaussian) distribution for x,y and theta.
 	normal_distribution<double> dist_x(x, std[0]);
@@ -63,7 +63,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
         p.theta = dist_theta(gen);
         p.weight = 1.0;
 
-        /* add p to particles vector */
+        /* add p to particles vector and weight to weights vector */
         particles.push_back(p);
         weights.push_back(p.weight);
     }
@@ -86,6 +86,7 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
     normal_distribution<double> N_theta_noise(0, std_pos[2]);
 #endif
 
+    /* Update state of all the particles */
     for (int i = 0; i < num_particles; i++) {
 
         if(fabs(yaw_rate) < 0.0001)
@@ -148,7 +149,6 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
     /* set the observation's id to the nearest predicted landmark's id */
      observations[i].id = id;
      //std::cout<<"assoc_id: "<<id<< " obs_pos x: "<<obs_pos.x<<" obs_pos y: "<<obs_pos.y<<std::endl;
-
   }
 
 }
@@ -169,8 +169,8 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 #if RUN_MODE == DEBUG
     return;
 #else
+    /* Vector to hold landmarks that are within sensor range */
     vector<LandmarkObs> landmarks_in_range;
-
 
     /* Loop over each particle */
     for (int i = 0; i < num_particles; ++i){
@@ -204,13 +204,12 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
             }
         }
 
-
-
         /* Perform data association */
         dataAssociation(landmarks_in_range, transformed_obs);
 
         /* initialize weight */
         particles[i].weight = 1.0;
+        weights[i] = 1.0;
 
         const double s_x = std_landmark[0];
         const double s_y = std_landmark[1];
@@ -256,6 +255,7 @@ void ParticleFilter::resample() {
     return;
 #else
 
+   /* Vector for saving resampled particles */
    vector<Particle> particles_resampled;
 
    default_random_engine gen;
@@ -265,13 +265,14 @@ void ParticleFilter::resample() {
       weights.push_back(particles[i].weight);
    }*/
 
+   /* Create uniform integer distribution for drawing indices randomly for resampling */
    uniform_int_distribution<int> int_dist(0, num_particles-1);
    int index = int_dist(gen);
 
    /* Find maximum weight */
    double max_weight = *std::max_element(weights.begin(), weights.end());
 
-   std::cout<<"max_weight: "<<max_weight<< std::endl;
+   //std::cout<<"max_weight: "<<max_weight<< std::endl;
 
    double beta = 0.0;
 
@@ -290,6 +291,7 @@ void ParticleFilter::resample() {
 
    }
 
+   /* Resample with replace */
    particles = particles_resampled;
 #endif
 }
