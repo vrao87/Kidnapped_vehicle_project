@@ -204,6 +204,12 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
             }
         }
 
+        if(landmarks_in_range.empty()){
+            particles[i].weight = 0.0;
+            weights[i] = 0.0;
+            continue;
+        }
+
         /* Perform data association */
         dataAssociation(landmarks_in_range, transformed_obs);
 
@@ -239,7 +245,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
           particles[i].weight *= obs_w;
         }
         weights[i] = particles[i].weight;
-        std::cout << "Particle weight " << particles[i].weight << std::endl;
+        //std::cout << "Particle weight " << particles[i].weight << std::endl;
     }
 #endif      
     
@@ -282,7 +288,7 @@ void ParticleFilter::resample() {
    /* Use resample wheel algorithm to draw the indexs randomly */
    for(int i = 0; i < num_particles; i++){
       beta += real_dist(gen) * 2.0;
-      std::cout<<"Beta: "<<beta<<std::endl;
+      //std::cout<<"Beta: "<<beta<<std::endl;
       while (beta > weights[index]) {
          beta -= weights[index];
          index = (index + 1) % num_particles;
